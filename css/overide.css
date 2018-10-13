@@ -1,0 +1,57 @@
+.page-container {
+    padding-left: 0;
+}
+
+.main-content {
+    padding-top: 10px;
+}
+
+.project-column{
+    max-height: 700px;
+    height: 700px;
+    overflow: overlay;
+}
+.velocityGraph{
+    width: 100%;
+    height: 250px;
+    font-family:Poppins, sans-serif;
+    font-size:12px;
+    font-weight:400;
+}
+
+.projectcard {
+    overflow: auto;
+    background: #fff;
+    color: #000;
+    -webkit-border-radius: 8px;
+    -moz-border-radius: 8px;
+    border-radius: 8px;
+    padding: 5px 10px;
+    margin-bottom: 8px;
+    text-align: left;
+    box-shadow: 0 1px 3px rgba(106,115,125,0.3);
+    border: 1px #e1e4e8 solid!important;
+}
+
+.projectcard_issue {
+    margin-top: 6px;
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: -moz-box;
+    display: -ms-flexbox;
+    display: block;
+    -webkit-box-pack: end;
+    -webkit-justify-content: flex-end;
+    -moz-box-pack: end;
+    -ms-flex-pack: end;
+    justify-content: flex-end;
+}
+
+.projectcard_issue_text {}
+.projectcard_issue_label {
+    margin-right: 2px;
+}
+
+.projectcard_issue_value{
+
+}
