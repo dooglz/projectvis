@@ -6,7 +6,8 @@ $(document).ready(function () {
     url: "http://samserrels.com/projectview/get.php",
     dataType: "json",
     async: false, // this is by default false, so not need to mention
-    crossDomain: true // tell the browser to allow cross domain calls.
+    crossDomain: true, // tell the browser to allow cross domain calls.
+    data: { repo: "gpuvis_server", user: "dooglz" }
   })
     .fail(function () {
       console.log("error");
@@ -19,14 +20,56 @@ $(document).ready(function () {
       velocity();
       commitLog();
       milestones();
-      
-window.addEventListener("resize", VelocityGraph);
+
+      window.addEventListener("resize", VelocityGraph);
     });
 });
 
 let issues = { open: [], closed: [] };
 let velocityData = [];
 let valueLabels = {};
+let objstore = {};
+function GraphToObj(gql) {
+
+  let recurse = (e, p, name, depth) => {
+    depth++;
+    if (depth > 10) { return; }
+    let isArr = Array.isArray(e);
+    let isval = !isArr && (typeof (e) !== "object" || (e === null));
+    let isEdgeArray = ((e !== null) && Object.keys(e).length === 1 && Object.keys(e)[0] === "edges");
+    let isNodeEdge = ((e !== null) && Object.keys(e).length === 1 && Object.keys(e)[0] === "node");
+    if (isEdgeArray) {
+      let edges = e.edges;
+      p[name] = edges;
+      e = edges;
+    }
+    if (isNodeEdge) {
+      let node = e.node;
+      p[name] = node;
+      e = node;
+    };
+    if (!isArr && !isval) {
+      if (e.id) {
+        //leaf object
+        if (objstore[e.id]) {
+          objstore[e.id] = { ...objstore[e.id], ...e };
+        } else {
+          objstore[e.id] = e;
+        }
+        p[name] = objstore[e.id];
+        e = objstore[e.id];
+      }
+      for (child in e) {
+        recurse(e[child], e, child, depth);
+      }
+    } else if (isArr && !isval) {
+      console.warn("bop", e);
+    }
+  };
+  recurse(gql, {}, "", 0);
+  return gql;
+}
+
 
 function processLabels() {
   //define label classes
@@ -116,19 +159,19 @@ function canban() {
     vt.text(valueScore);
     tmp.append(it);
     tmp.append(vt);
-    return {element:tmp, value:valueScore};
+    return { element: tmp, value: valueScore };
   };
 
   let i = 0;
   for (col of data.repository.projects.edges[0].node.columns.edges) {
     let collum = col.node;
     let div = $("#card-body-" + i);
-    let valueScore =0;
+    let valueScore = 0;
     $("#card-count-" + i).html(collum.cards.edges.length);
     div.empty();
     for (cardref of collum.cards.edges) {
       let card = makeCard(cardref.node);
-      valueScore+= card.value;
+      valueScore += card.value;
       div.append(card.element);
     }
     $("#total-value-" + i).html(valueScore);
@@ -177,16 +220,16 @@ function milestones() {
 function VelocityGraph() {
   let data = velocityData.slice(0);
   {
-    const dlnow = data.length-1;
+    const dlnow = data.length - 1;
     for (let i = 0; i < dlnow; i++) {
-      const timeTilNext = data[i+1].date - data[i].date;
-      const milisInAWeek=604800000;
-      const weeks = timeTilNext/milisInAWeek;
-      if(weeks > 1){
-        let new0point = new Date(data[i].date).setDate(data[i].date.getDate()+7);
-        data.push({value:0, date:new0point});
-        new0point = new Date(data[i+1].date).setDate(data[i].date.getDate()-7);
-        data.push({value:0, date:new0point});
+      const timeTilNext = data[i + 1].date - data[i].date;
+      const milisInAWeek = 604800000;
+      const weeks = timeTilNext / milisInAWeek;
+      if (weeks > 1) {
+        let new0point = new Date(data[i].date).setDate(data[i].date.getDate() + 7);
+        data.push({ value: 0, date: new0point });
+        new0point = new Date(data[i + 1].date).setDate(data[i].date.getDate() - 7);
+        data.push({ value: 0, date: new0point });
       }
     }
     data.sort((a, b) => { return (new Date(a.date) - new Date(b.date)) });
