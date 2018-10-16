@@ -3,6 +3,12 @@ let userData;
 let options;
 let odata;
 let allrepodata;
+
+let issues = { open: [], closed: [] };
+let velocityData = [];
+let valueLabels = {};
+let labels = {};
+let repocolorScale = d3.scaleOrdinal(d3.schemeCategory10);
 function _query(query) {
   return new Promise((resolve, reject) => {
     $.ajax({
@@ -36,7 +42,6 @@ function getUserData(username) {
   return _query({ userinfo: username });
 }
 
-
 $(document).ready(function () {
   options = Cookies.get('ProjectViewUserData');
   if (options === undefined) {
@@ -69,10 +74,6 @@ function build() {
   window.addEventListener("resize", VelocityGraph);
   $("#reposelect").click(() => { $("#largeModal").modal('show') });
 }
-
-let issues = { open: [], closed: [] };
-let velocityData = [];
-let valueLabels = {};
 
 function GraphToObj(gql) {
   let obj = {};
@@ -129,6 +130,7 @@ function GraphToObj(gql) {
   });
 }
 
+
 function MergeRepos(repos) {
   let obj = {};
   let keys = ["issues", "milestones", "labels", "projects"];
@@ -137,14 +139,25 @@ function MergeRepos(repos) {
     for (repo of repos) {
       for (ro of repo[k]) {
         //Check for id collisions.
-        if(obj[k].find((e)=>{return e.id === ro.id})){
+        if (obj[k].find((e) => { return e.id === ro.id })) {
           console.warn("ID collision", ro);
         }
+        ro.origin_repo = repo;
+
         obj[k].push(ro);
       }
     }
   }
+
+  obj.projects.forEach((v, i) => { v.idx = i; });
   return obj;
+}
+
+function isEnabledProject(repo, project) {
+  return (options.repos.find((e) => {
+    return e.repo.toLowerCase() == repo.toLowerCase()
+      && e.projects.find(p => p.toLowerCase() == project.toLowerCase())
+  }));
 }
 
 function RepoList() {
@@ -162,13 +175,15 @@ function RepoList() {
   let repoCheckBoxes = $("#repoCheckBoxes");
   projectCheckBoxes.empty();
   repoCheckBoxes.empty();
+  let enabledprojects = $("<div/>");
 
   for (repo of data.repos) {
     for (proj of repo.projects) {
       let c = pchk(repo.name + " - " + proj.name);
 
-      if (options.repos.find((e) => { return e.repo.toLowerCase() == repo.name.toLowerCase() && e.projects.includes(proj.name) })) {
+      if (isEnabledProject(repo.name, proj.name)) {
         c.find("input").prop("checked", true);
+        enabledprojects.append('<div class="project_' + proj.idx + '"><div class="block"/>' + repo.name + ':' + proj.name + '</div>');
       }
 
       projectCheckBoxes.append(c);
@@ -182,6 +197,8 @@ function RepoList() {
     }
     repoCheckBoxes.append(c);
   }
+
+  $("#headder-middle").append("Visible Projects").append(enabledprojects);
 
 }
 
@@ -197,11 +214,15 @@ function processLabels() {
     if (lb.color == "eeefff") {
       valueLabels[lb.name] = parseInt(lb.name);
     } else {
+      if (labels[lb.name] !== undefined) {
+        continue;
+      }
       let rgb = hexToRgb('#' + lb.color);
       let txtcolour = "#fff";
       if (((rgb.r + rgb.g + rgb.b) / 3) > 128) {
         txtcolour = "#000";
       }
+      labels[lb.name] = [lb.color, txtcolour];
       var styleTag = $('<style>.label_' + lb.name + ' { background-color:#' + lb.color + ';color:' + txtcolour + '; }</style>');
       $('html > head').append(styleTag);
     }
@@ -237,9 +258,9 @@ function velocity() {
 }
 
 function canban() {
-  let makeCard = (card) => {
+  let makeCard = (card, proj) => {
     let id = card.id;
-    let tmp = $('<div class="projectcard"></div>');
+    let tmp = $('<div class="projectcard project_' + proj.idx + '"></div>');
     let it = $('<div class="projectcard_issue float-left"></div>');
     let vt = $('<div class="projectcard_issue_value float-right badge badge-info ">12</div>');
     let valueScore = 0;
@@ -270,24 +291,30 @@ function canban() {
       }
     }
     vt.text(valueScore);
+    tmp.append($('<div class="projectmarker"/>'));
     tmp.append(it);
     tmp.append(vt);
     return { element: tmp, value: valueScore };
   };
 
-  let i = 0;
-  for (col of data.repository.projects[0].columns) {
-    let div = $("#card-body-" + i);
+  //hardcoded 3 columns for now
+  for (let colID = 0; colID < 3; colID++) {
+    let div = $("#card-body-" + colID);
     let valueScore = 0;
-    $("#card-count-" + i).html(col.cards.length);
+    let cardcount = 0;
     div.empty();
-    for (cardref of col.cards) {
-      let card = makeCard(cardref);
-      valueScore += card.value;
-      div.append(card.element);
+    for (proj of data.repository.projects) {
+      if (isEnabledProject(proj.origin_repo.name, proj.name) && proj.columns[colID]) {
+        for (card of proj.columns[colID].cards) {
+          cardcount++;
+          let carddiv = makeCard(card, proj);
+          valueScore += carddiv.value;
+          div.append(carddiv.element);
+        }
+      }
     }
-    $("#total-value-" + i).html(valueScore);
-    i++;
+    $("#card-count-" + colID).html(cardcount);
+    $("#total-value-" + colID).html(valueScore);
   }
 }
 

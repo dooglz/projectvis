@@ -20,6 +20,8 @@
 }
 
 .projectcard {
+    display: flex;
+    flex-flow: initial;
     overflow: auto;
     background: #fff;
     color: #000;
@@ -34,6 +36,7 @@
 }
 
 .projectcard_issue {
+    flex: auto;
     margin-top: 6px;
     display: -webkit-box;
     display: -webkit-flex;
@@ -53,5 +56,57 @@
 }
 
 .projectcard_issue_value{
-
+    height: 20px;
 }
+.projectmarker{
+    width: 5px;
+ 
+    float: left;
+    margin-right: 5px;
+    margin-left: -5px;
+}
+
+.project_0 .projectmarker{
+    background-color: #1f77b4
+}
+.project_1 .projectmarker{
+    background-color: #ff7f0e
+}
+.project_2 .projectmarker{
+    background-color: #2ca02c
+}
+.project_3 .projectmarker{
+    background-color: #d62728
+}
+
+.headder-middle{
+    text-align: center;
+    margin: auto;
+    display: grid;
+}
+.headder-middle div{
+    float:left;
+}
+
+.headder-middle .block{
+    height: 10px;
+    width: 10px;
+    margin-top: 8px;
+    border-radius: 8px;
+    margin-right: 5px;
+    margin-left: 10px;
+}
+
+.headder-middle .project_0 .block{
+    background-color: #1f77b4
+}
+.headder-middle .project_1 .block{
+    background-color: #ff7f0e
+}
+.headder-middle .project_2 .block{
+    background-color: #2ca02c
+}
+.headder-middle .project_3 .block{
+    background-color: #d62728
+}
+
