@@ -2,7 +2,7 @@ let data = {};
 let userData;
 let options;
 let odata;
-
+let allrepodata;
 function _query(query) {
   return new Promise((resolve, reject) => {
     $.ajax({
@@ -18,8 +18,19 @@ function _query(query) {
   });
 }
 
-function getRepoData(username, reponame) {
-  return _query({ repo: reponame, user: username });
+function getRepoData(username, repos) {
+  let proms = [];
+  repos.forEach((r) => {
+    proms.push(_query({ repo: r.repo, user: username }));
+  });
+
+  return Promise.all(proms).then((repodatas) => {
+    console.log("repodatas", repodatas);
+    allrepodata = repodatas;
+    return repodatas;
+  });
+
+  //return _query({ repo: repos[0], user: username });
 }
 function getUserData(username) {
   return _query({ userinfo: username });
@@ -31,7 +42,7 @@ $(document).ready(function () {
   if (options === undefined) {
     options = {};
     options.user = "dooglz";
-    options.repos = [{ repo: "gpuvis_server", projects: ["GPUVIS_Server"] }];
+    options.repos = [{ repo: "gpuvis_server", projects: ["GPUVIS_Server"] }, { repo: "gpuvis", projects: ["gpuvis"] }];
     Cookies.set('ProjectViewUserData', options);
     console.info("Default options Set ", options);
   } else {
@@ -41,9 +52,9 @@ $(document).ready(function () {
   console.log("Page Ready!");
   getUserData(options.user)
     .then((d) => { return GraphToObj(d); })
-    .then((d) => { userData = d.data; return getRepoData(options.user, options.repos[0].repo); })
-    .then((d) => { odata = d.data; return GraphToObj(odata); })
-    .then((d) => { data = d; data.repos = [d.repository]; build() });
+    .then((d) => { userData = d.data; return getRepoData(options.user, options.repos); })
+    .then((d) => { odata = d; return Promise.all(odata.map(x => GraphToObj(x.data.repository))); })
+    .then((d) => { data.repos = d; data.repository = MergeRepos(d); build() });
 });
 
 function build() {
@@ -116,6 +127,24 @@ function GraphToObj(gql) {
     console.info("Converted to Native OBJ");
     resolve(obj);
   });
+}
+
+function MergeRepos(repos) {
+  let obj = {};
+  let keys = ["issues", "milestones", "labels", "projects"];
+  for (k of keys) {
+    obj[k] = [];
+    for (repo of repos) {
+      for (ro of repo[k]) {
+        //Check for id collisions.
+        if(obj[k].find((e)=>{return e.id === ro.id})){
+          console.warn("ID collision", ro);
+        }
+        obj[k].push(ro);
+      }
+    }
+  }
+  return obj;
 }
 
 function RepoList() {
