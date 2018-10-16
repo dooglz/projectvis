@@ -1,11 +1,12 @@
 let data = {};
+let odata;
 $(document).ready(function () {
   console.log("ready!");
   $.ajax({
     type: 'GET',
     url: "http://samserrels.com/projectview/get.php",
     dataType: "json",
-    async: false, // this is by default false, so not need to mention
+    async: true,
     crossDomain: true, // tell the browser to allow cross domain calls.
     data: { repo: "gpuvis_server", user: "dooglz" }
   })
@@ -14,75 +15,89 @@ $(document).ready(function () {
     })
     .done((d) => {
       console.log("success", d);
-      data = d.data;
-      processLabels();
-      canban();
-      velocity();
-      commitLog();
-      milestones();
-
-      window.addEventListener("resize", VelocityGraph);
+      odata = d.data;
+      data = GraphToObj(odata).then((d) => { data = d; build() });
     });
 });
+
+function build() {
+  processLabels();
+  canban();
+  velocity();
+  commitLog();
+  milestones();
+
+  window.addEventListener("resize", VelocityGraph);
+}
 
 let issues = { open: [], closed: [] };
 let velocityData = [];
 let valueLabels = {};
-let objstore = {};
-function GraphToObj(gql) {
 
-  let recurse = (e, p, name, depth) => {
-    depth++;
-    if (depth > 10) { return; }
-    let isArr = Array.isArray(e);
-    let isval = !isArr && (typeof (e) !== "object" || (e === null));
-    let isEdgeArray = ((e !== null) && Object.keys(e).length === 1 && Object.keys(e)[0] === "edges");
-    let isNodeEdge = ((e !== null) && Object.keys(e).length === 1 && Object.keys(e)[0] === "node");
-    if (isEdgeArray) {
-      let edges = e.edges;
-      p[name] = edges;
-      e = edges;
-    }
-    if (isNodeEdge) {
-      let node = e.node;
-      p[name] = node;
-      e = node;
-    };
-    if (!isArr && !isval) {
-      if (e.id) {
-        //leaf object
-        if (objstore[e.id]) {
-          objstore[e.id] = { ...objstore[e.id], ...e };
-        } else {
-          objstore[e.id] = e;
+function GraphToObj(gql) {
+  let obj = {};
+  obj.objstore = {};
+  return new Promise((resolve, reject, ) => {
+    let recurse = (e, p, name, o, op, depth, depthstr) => {
+      depthstr += name + "_";
+      depth++;
+      if (depth > 10) { return; }
+      let isArr = Array.isArray(e);
+      let isval = !isArr && (typeof (e) !== "object" || ((e === null) || $.isEmptyObject(e)));
+      let isEdgeArray = ((e !== null) && Object.keys(e).length === 1 && Object.keys(e)[0] === "edges");
+      let isNodeEdge = ((e !== null) && Object.keys(e).length === 1 && Object.keys(e)[0] === "node");
+      //console.log(depth, depthstr, name, isArr, isval, isEdgeArray, isNodeEdge);
+      if (isEdgeArray) {
+        let edges = e.edges;
+        op[name] = edges;
+        o = op[name];
+        e = edges;
+      }
+      if (isNodeEdge) {
+        let node = e.node;
+        op[name] = node;
+        o = op[name];
+        e = node;
+      };
+      if (!isArr && !isval) {
+        if (e.id) {
+          //leaf object
+          if (obj.objstore[e.id]) {
+            obj.objstore[e.id] = { ...obj.objstore[e.id], ...e };
+          } else {
+            obj.objstore[e.id] = e;
+          }
+          op[name] = obj.objstore[e.id];
+          e = obj.objstore[e.id];
+          o = op[name];
         }
-        p[name] = objstore[e.id];
-        e = objstore[e.id];
+        for (child in e) {
+          if (o[child] == undefined) { o[child] = {}; }
+          recurse(e[child], e, child, o[child], o, depth, depthstr);
+        }
+      } else if (isArr && !isval && !isEdgeArray && isNodeEdge) {
+        console.warn("bop", e);
       }
-      for (child in e) {
-        recurse(e[child], e, child, depth);
-      }
-    } else if (isArr && !isval) {
-      console.warn("bop", e);
-    }
-  };
-  recurse(gql, {}, "", 0);
-  return gql;
+    };
+    recurse(gql, {}, "", obj, {}, 0, "");
+    console.info("Converted to Native OBJ");
+    resolve(obj);
+  });
 }
 
 
 function processLabels() {
   //define label classes
-  for (lb of data.repository.labels.edges) {
-    if (lb.node.color == "eeefff") {
-      valueLabels[lb.node.name] = parseInt(lb.node.name);
+  for (lb of data.repository.labels) {
+    if (lb.color == "eeefff") {
+      valueLabels[lb.name] = parseInt(lb.name);
     } else {
-      let rgb = hexToRgb('#' + lb.node.color);
+      let rgb = hexToRgb('#' + lb.color);
       let txtcolour = "#fff";
       if (((rgb.r + rgb.g + rgb.b) / 3) > 128) {
         txtcolour = "#000";
       }
-      var styleTag = $('<style>.label_' + lb.node.name + ' { background-color:#' + lb.node.color + ';color:' + txtcolour + '; }</style>');
+      var styleTag = $('<style>.label_' + lb.name + ' { background-color:#' + lb.color + ';color:' + txtcolour + '; }</style>');
       $('html > head').append(styleTag);
     }
   }
@@ -90,26 +105,26 @@ function processLabels() {
 
 function velocity() {
   velocityData = [];
-  for (e of data.repository.issues.edges) {
-    if (e.node.closedAt && e.node.closedAt != null) {
-      issues.closed.push(e.node);
+  for (e of data.repository.issues) {
+    if (e.closedAt && e.closedAt != null && !$.isEmptyObject(e.closedAt)) {
+      issues.closed.push(e);
     } else {
-      issues.open.push(e.node);
+      issues.open.push(e);
     }
   }
   for (issue of issues.closed) {
     let issuevalue = 0;
-    for (labelref of issue.labels.edges) {
-      let label_id = labelref.node.id;
-      let label = data.repository.labels.edges.find((l) => {
-        return l.node.id == label_id;
-      });
-      if (valueLabels[label.node.name] != undefined) {
-        issuevalue += parseInt(label.node.name);
+    for (label of issue.labels) {
+      if (valueLabels[label.name] != undefined) {
+        issuevalue += parseInt(label.name);
       }
     }
     if (issuevalue > 0) {
-      velocityData.push({ value: issuevalue, date: new Date(issue.closedAt) });
+      let date = new Date(issue.closedAt)
+      if (!isFinite(date)) {
+        console.error("Invalid date", date);
+      }
+      velocityData.push({ value: issuevalue, date: date });
     }
   }
   velocityData.sort((a, b) => { return (new Date(a.date) - new Date(b.date)) });
@@ -124,33 +139,26 @@ function canban() {
     let vt = $('<div class="projectcard_issue_value float-right badge badge-info ">12</div>');
     let valueScore = 0;
 
-    let assosiated_issues = data.repository.issues.edges.filter((i) => {
-      for (c of i.node.projectCards.edges) {
-        if (c.node.id == id) {
+    let assosiated_issues = data.repository.issues.filter((i) => {
+      for (c of i.projectCards) {
+        if (c.id == id) {
           return true;
         }
       }
       return false;
     });
     //it.text(id);
-    if (card.note && card.note != "null") { it.append(card.note + "<br>"); }
+    if (card.note && card.note != "null" && !$.isEmptyObject(card.note)) { it.append(card.note + "<br>"); }
     if (assosiated_issues) {
       for (ai of assosiated_issues) {
         let iit = $('<div class="projectcard_issue_text"/>');
-        iit.append(ai.node.title);
-        let labels = [];
-        for (lb of ai.node.labels.edges) {
-          let lid = lb.node.id;
-          labels.push(data.repository.labels.edges.find((l) => {
-            return l.node.id == lid;
-          }));
-        }
+        iit.append("" + ai.title);
         it.append(iit);
-        for (lb of labels) {
-          if (valueLabels[lb.node.name] != undefined) {
-            valueScore += parseInt(lb.node.name);
+        for (lb of ai.labels) {
+          if (valueLabels[lb.name] != undefined) {
+            valueScore += parseInt(lb.name);
           } else {
-            it.append($('<div class="projectcard_issue_label badge label_' + lb.node.name + '">' + lb.node.name + '<div>'));
+            it.append($('<div class="projectcard_issue_label badge label_' + lb.name + '">' + lb.name + '<div>'));
           }
         }
 
@@ -163,14 +171,13 @@ function canban() {
   };
 
   let i = 0;
-  for (col of data.repository.projects.edges[0].node.columns.edges) {
-    let collum = col.node;
+  for (col of data.repository.projects[0].columns) {
     let div = $("#card-body-" + i);
     let valueScore = 0;
-    $("#card-count-" + i).html(collum.cards.edges.length);
+    $("#card-count-" + i).html(col.cards.length);
     div.empty();
-    for (cardref of collum.cards.edges) {
-      let card = makeCard(cardref.node);
+    for (cardref of col.cards) {
+      let card = makeCard(cardref);
       valueScore += card.value;
       div.append(card.element);
     }
@@ -187,15 +194,14 @@ function commitLog() {
 function milestones() {
   let div = $("#milestone_container");
   div.empty();
-  for (ms of data.repository.milestones.edges) {
-    let assosiated_issues = data.repository.issues.edges.filter((i) => {
-      return (i.node.milestone && i.node.milestone.id == ms.node.id)
+  for (ms of data.repository.milestones) {
+    let assosiated_issues = data.repository.issues.filter((i) => {
+      return (i.milestone && i.milestone.id == ms.id)
     });
     let open = 0;
     let closed = 0;
-    console.log(assosiated_issues);
     for (issue of assosiated_issues) {
-      if (issues.open.includes(issue.node)) {
+      if (issues.open.includes(issue)) {
         open++;
       } else {
         closed++;
@@ -209,7 +215,7 @@ function milestones() {
   </div>\
   </div>\
   </div>)');
-    msd.find(".au-progress__title").text(ms.node.title);
+    msd.find(".au-progress__title").text(ms.title);
     msd.find(".fud").text(percent + "% complete, " + open + ' open, ' + closed + ' closed');
     div.append(msd);
   }
