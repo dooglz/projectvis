@@ -1,33 +1,62 @@
 let data = {};
+let userData;
+let options;
 let odata;
-$(document).ready(function () {
-  console.log("ready!");
-  $.ajax({
-    type: 'GET',
-    url: "http://samserrels.com/projectview/get.php",
-    dataType: "json",
-    async: true,
-    crossDomain: true, // tell the browser to allow cross domain calls.
-    data: { repo: "gpuvis_server", user: "dooglz" }
-  })
-    .fail(function () {
-      console.log("error");
+
+function _query(query) {
+  return new Promise((resolve, reject) => {
+    $.ajax({
+      type: 'GET',
+      url: "http://samserrels.com/projectview/get.php",
+      dataType: "json",
+      async: true,
+      crossDomain: true,
+      data: query
     })
-    .done((d) => {
-      console.log("success", d);
-      odata = d.data;
-      data = GraphToObj(odata).then((d) => { data = d; build() });
-    });
+      .fail(reject)
+      .done(resolve);
+  });
+}
+
+function getRepoData(username, reponame) {
+  return _query({ repo: reponame, user: username });
+}
+function getUserData(username) {
+  return _query({ userinfo: username });
+}
+
+
+$(document).ready(function () {
+  options = Cookies.get('ProjectViewUserData');
+  if (options === undefined) {
+    options = {};
+    options.user = "dooglz";
+    options.repos = [{ repo: "gpuvis_server", projects: ["GPUVIS_Server"] }];
+    Cookies.set('ProjectViewUserData', options);
+    console.info("Default options Set ", options);
+  } else {
+    console.info("Options loaded from Cookies ", options);
+  }
+
+  console.log("Page Ready!");
+  getUserData(options.user)
+    .then((d) => { return GraphToObj(d); })
+    .then((d) => { userData = d.data; return getRepoData(options.user, options.repos[0].repo); })
+    .then((d) => { odata = d.data; return GraphToObj(odata); })
+    .then((d) => { data = d; data.repos = [d.repository]; build() });
 });
 
 function build() {
+  console.log("Building!");
   processLabels();
+  RepoList();
+  headder();
   canban();
   velocity();
   commitLog();
   milestones();
-
   window.addEventListener("resize", VelocityGraph);
+  $("#reposelect").click(() => { $("#largeModal").modal('show') });
 }
 
 let issues = { open: [], closed: [] };
@@ -46,7 +75,7 @@ function GraphToObj(gql) {
       let isval = !isArr && (typeof (e) !== "object" || ((e === null) || $.isEmptyObject(e)));
       let isEdgeArray = ((e !== null) && Object.keys(e).length === 1 && Object.keys(e)[0] === "edges");
       let isNodeEdge = ((e !== null) && Object.keys(e).length === 1 && Object.keys(e)[0] === "node");
-      //console.log(depth, depthstr, name, isArr, isval, isEdgeArray, isNodeEdge);
+      // console.log(depth, depthstr, name, isArr, isval, isEdgeArray, isNodeEdge);
       if (isEdgeArray) {
         let edges = e.edges;
         op[name] = edges;
@@ -59,6 +88,10 @@ function GraphToObj(gql) {
         o = op[name];
         e = node;
       };
+      if (!isEdgeArray && !isNodeEdge && !isArr && isval) {
+        op[name] = e;
+        o = op[name];
+      }
       if (!isArr && !isval) {
         if (e.id) {
           //leaf object
@@ -85,6 +118,49 @@ function GraphToObj(gql) {
   });
 }
 
+function RepoList() {
+
+  let pchk = (d) => {
+    return $(' \
+    <div class="checkbox"> \
+    <label for="pck1_'+ d + '" class="form-check-label "> \
+      <input type="checkbox" id="pck1_'+ d + '" name="pck1_' + d + '" value="option1" class="form-check-input">' + d + '\
+    </label></div>');
+  };
+
+  let div = $("#repoModalBody");
+  let projectCheckBoxes = $("#projectCheckBoxes");
+  let repoCheckBoxes = $("#repoCheckBoxes");
+  projectCheckBoxes.empty();
+  repoCheckBoxes.empty();
+
+  for (repo of data.repos) {
+    for (proj of repo.projects) {
+      let c = pchk(repo.name + " - " + proj.name);
+
+      if (options.repos.find((e) => { return e.repo.toLowerCase() == repo.name.toLowerCase() && e.projects.includes(proj.name) })) {
+        c.find("input").prop("checked", true);
+      }
+
+      projectCheckBoxes.append(c);
+    }
+  }
+  userData.repositoryOwner.repositories.sort((a, b) => { return new Date(b.updatedAt) - new Date(a.updatedAt) })
+  for (repo of userData.repositoryOwner.repositories) {
+    let c = pchk(repo.name)
+    if (options.repos.find((e) => { return e.repo.toLowerCase() == repo.name.toLowerCase() })) {
+      c.find("input").prop("checked", true);
+    }
+    repoCheckBoxes.append(c);
+  }
+
+}
+
+function headder() {
+  $("#username").text("Dooglz");
+  $("#user_image").prop("alt", "Dooglz");
+  $("#user_image").prop("src", userData.repositoryOwner.avatarUrl);
+}
 
 function processLabels() {
   //define label classes
@@ -190,7 +266,6 @@ function commitLog() {
 
 }
 
-
 function milestones() {
   let div = $("#milestone_container");
   div.empty();
@@ -220,8 +295,6 @@ function milestones() {
     div.append(msd);
   }
 }
-
-
 
 function VelocityGraph() {
   let data = velocityData.slice(0);
