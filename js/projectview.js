@@ -14,13 +14,13 @@ function _query(query) {
   return new Promise((resolve, reject) => {
     $.ajax({
       type: 'GET',
-      url: "http://samserrels.com/projectview/get.php",
+      url: "https://samserrels.com/projectview/get.php",
       dataType: "json",
       async: true,
       crossDomain: true,
       data: query
     })
-      .fail(reject)
+      .fail((e) => { reject([e, query]) })
       .done(resolve);
   });
 }
@@ -44,8 +44,9 @@ function getUserData(username) {
 }
 
 $(document).ready(function () {
-  options = Cookies.get('ProjectViewUserData');
-  if (options === undefined) {
+  const rawOptions = Cookies.get('ProjectViewUserData');
+  if (rawOptions !== undefined) { options = JSON.parse(); }
+  if (options === undefined || !options.user) {
     options = {};
     options.user = "dooglz";
     options.repos = [{ repo: "gpuvis_server", projects: ["GPUVIS_Server"] }, { repo: "gpuvis", projects: ["gpuvis"] }];
@@ -54,13 +55,13 @@ $(document).ready(function () {
   } else {
     console.info("Options loaded from Cookies ", options);
   }
-
+  let er = e => { return ec => { console.error("promise err", e, ec); throw (ec); } };
   console.log("Page Ready!");
   getUserData(options.user)
-    .then((d) => { return GraphToObj(d); })
-    .then((d) => { userData = d.data; return getRepoData(options.user, options.repos); })
-    .then((d) => { odata = d; return Promise.all(odata.map(x => GraphToObj(x.data.repository))); })
-    .then((d) => { data.repos = d; data.repository = MergeRepos(d); build() });
+    .then((d) => { return GraphToObj(d); }, er("getUserData"))
+    .then((d) => { userData = d.data; return getRepoData(options.user, options.repos); }, er("GraphToObj"))
+    .then((d) => { odata = d; return Promise.all(odata.map(x => GraphToObj(x.data.repository))); }, er("getRepoData"))
+    .then((d) => { data.repos = d; data.repository = MergeRepos(d); build() }, er("GraphToObj"));
 });
 
 function build() {
