@@ -552,3 +552,48 @@ function hexToRgb(hex) {
     b: parseInt(result[3], 16)
   } : null;
 }
+
+
+
+var i = 0;
+
+let dragstartY =0;
+var dragging = false;
+   $('#dragbar').mousedown(function(e){
+       e.preventDefault();
+       dragstartY = e.pageY-100;
+       dragging = true;
+       var main = $('#mainContainer');
+       var wrapper = $('#canbanrow');
+       var ghostbar = $('<div>',
+                        {id:'ghostbar',
+                         css: {
+                                width: main.outerWidth(),
+                           			top: e.pageY-100,
+                                left: main.offset().left
+                               }
+                        }).appendTo('#canbanrow');
+       
+        $(document).mousemove(function(e){
+          ghostbar.css("top", (e.pageY-100));
+       });
+       
+    });
+
+   $(document).mouseup(function(e){
+       if (dragging) 
+       {
+         console.log("drag", dragstartY - e.pageY );
+
+
+/*           var percentage = ((e.pageY - $('#canbanrow').offset().top) / $('#canbanrow').height()) * 100;
+           var mainPercentage = 100-percentage;  
+           
+           $('.project-column').css("height",percentage + "%");
+           $('#mainContainer').css("height",mainPercentage + "%");*/
+           $('#ghostbar').remove();
+           $(document).unbind('mousemove');
+           dragging = false;
+           $('.project-column').height($('.project-column').height() - (dragstartY - e.pageY));
+       }
+    });

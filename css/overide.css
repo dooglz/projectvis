@@ -7,7 +7,6 @@
 }
 
 .project-column{
-    max-height: 700px;
     height: 700px;
     overflow: overlay;
 }
@@ -122,4 +121,23 @@
 
 .sliderDiv .tooltip2 {
     opacity: 100;
+}
+
+#dragbar{
+    margin: auto;
+    background-color: #0000001c;
+    height: 3px;
+    width: 90%;
+    cursor: row-resize;
+    margin-bottom: 20px;
+ }
+
+ #ghostbar{
+    width: 100%;
+    height: 3px;
+    background-color:#000;
+    opacity:0.5;
+    position:absolute;
+    cursor: col-resize;
+    z-index:999
 }
