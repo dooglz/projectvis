@@ -6,6 +6,7 @@ let allrepodata;
 
 let issues = { open: [], closed: [] };
 let velocityData = [];
+let sprintData = [];
 let valueLabels = {};
 let labels = {};
 let repocolorScale = d3.scaleOrdinal(d3.schemeCategory10);
@@ -245,7 +246,7 @@ function velocity() {
         issuevalue += parseInt(label.name);
       }
     }
-    if (issuevalue > 0) {
+    if (true || issuevalue > 0) {
       let date = new Date(issue.closedAt)
       if (!isFinite(date)) {
         console.error("Invalid date", date);
@@ -254,6 +255,37 @@ function velocity() {
     }
   }
   velocityData.sort((a, b) => { return (new Date(a.date) - new Date(b.date)) });
+  //MANGLE!
+  const milisInAWeek = 604800000;
+  let sprintTime = milisInAWeek;
+  let startpoint = velocityData[0];
+
+  // sprintData[0] = { date: startpoint.date, value: 0 };
+
+  let dataEntry = { date: startpoint.date, value: 0, count: 0, };
+  for (let i = 0; i < velocityData.length; i++) {
+    const vd = velocityData[i];
+    const timegap = (vd.date - dataEntry.date);
+    if (timegap <= sprintTime) {
+      dataEntry.value += vd.value;
+      dataEntry.count++;
+    } else {
+      //insert old
+      sprintData.push(dataEntry);
+      //seek new start time
+      let newStartPoint = new Date(dataEntry.date.getTime() + sprintTime);
+      while (vd.date - newStartPoint > sprintTime) {
+        dataEntry = { date: newStartPoint, value: 0 };
+        sprintData.push(dataEntry);
+        newStartPoint = new Date(dataEntry.date.getTime() + sprintTime);
+      }
+      dataEntry = { date: newStartPoint, value: 0, count: 0 };
+      dataEntry.value += vd.value;
+      dataEntry.count++;
+    }
+  }
+  sprintData.push(dataEntry);
+
   VelocityGraph();
 }
 
@@ -352,7 +384,74 @@ function milestones() {
   }
 }
 
+let ChartData;
+let mySlider;
 function VelocityGraph() {
+
+  ChartData = sprintData.slice(0);
+  let labels = [];
+  let datapoints = [];
+  let datapoints2 = [];
+  for (dp of ChartData) {
+    datapoints.push(dp.value);
+    labels.push(dp.date.toLocaleDateString());
+    datapoints2.push(dp.count);
+  }
+
+  mySlider = $("#velslider").slider({});
+
+
+
+  randomScalingFactor = function () {
+    return Math.round(Math.random() * 200 - 100);
+  };
+
+  var barChartData = {
+    labels: labels,
+    datasets: [{
+      label: 'Completed Card Value',
+      borderColor: "rgba(0, 123, 255, 0.9)",
+      borderWidth: "0",
+      backgroundColor: "rgba(0, 123, 255, 0.5)",
+      fontFamily: "Poppins",
+      yAxisID: 'y-axis-1',
+      data: datapoints
+    }, {
+      label: 'Completed Cards',
+      borderColor: "rgba(0,0,0,0.09)",
+      borderWidth: "0",
+      backgroundColor: "rgba(0,0,0,0.07)",
+      fontFamily: "Poppins",
+      yAxisID: 'y-axis-1',
+      data: datapoints2
+    }]
+
+  };
+
+  var ctx = $("#velocityGraphCanvas");
+  new Chart(ctx, {
+    type: 'bar',
+    data: barChartData,
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      tooltips: {
+        mode: 'index',
+        intersect: true
+      },
+      scales: {
+        yAxes: [{
+          type: 'linear',
+          display: true,
+          position: 'left',
+          id: 'y-axis-1',
+        }],
+      }
+    }
+  });
+};
+
+function VelocityGraph2() {
   let data = velocityData.slice(0);
   {
     const dlnow = data.length - 1;

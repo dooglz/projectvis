@@ -27,6 +27,7 @@
   <link href="vendor/perfect-scrollbar/perfect-scrollbar.css" rel="stylesheet" media="all">
   <!-- Main CSS-->
   <link href="css/theme.css" rel="stylesheet" media="all">
+  <link href="vendor/bootstrap-slider.css" rel="stylesheet" media="all">
   <link href="css/overide.css" rel="stylesheet" media="all">
 </head>
 
@@ -176,7 +177,11 @@
                     <h3 class="title-2">Project Velocity</h3>
                     <hr>
                     <div class="recent-report__chart">
-                      <svg class="velocityGraph" id="velocityGraph"></svg>
+                      <canvas id="velocityGraphCanvas"></canvas>
+                    </div>
+                    <div class="sliderDiv">
+                      <b>2017 </b> <input id="velslider" type="text" class="span2" value="" data-slider-min="1"
+                        data-slider-max="16" data-slider-step="1" data-slider-value="[1,16]" /><b> 2018</b>
                     </div>
                   </div>
                 </div>
@@ -330,6 +335,7 @@
   <script src="vendor/select2/select2.min.js"></script>
   <script src="https://d3js.org/d3.v5.min.js"></script>
   <script src="vendor/js.cookie-2.2.0.min.js"></script>
+  <script src="vendor/bootstrap-slider.min.js"></script>
   <!-- Main JS-->
   <script src="js/main.js"></script>
   <script src="js/projectview.js"></script>
