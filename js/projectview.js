@@ -45,7 +45,7 @@ function getUserData(username) {
 
 $(document).ready(function () {
   const rawOptions = Cookies.get('ProjectViewUserData');
-  if (rawOptions !== undefined) { options = JSON.parse(); }
+  if (rawOptions !== undefined) { options = JSON.parse(rawOptions); }
   if (options === undefined || !options.user) {
     options = {};
     options.user = "dooglz";
@@ -387,25 +387,26 @@ function milestones() {
 
 let ChartData;
 let mySlider;
-function VelocityGraph() {
 
-  ChartData = sprintData.slice(0);
+function VelocityGraph(low, high) {
   let labels = [];
   let datapoints = [];
   let datapoints2 = [];
-  for (dp of ChartData) {
-    datapoints.push(dp.value);
-    labels.push(dp.date.toLocaleDateString());
-    datapoints2.push(dp.count);
+
+  let sliceData = (low, high) => {
+    labels.length = 0
+    datapoints.length = 0
+    datapoints2.length = 0
+    if (low === undefined) { low = 0; }
+    if (high === undefined) { high = sprintData.length; }
+    ChartData = sprintData.slice(low, high + 1);
+    for (dp of ChartData) {
+      datapoints.push(dp.value);
+      labels.push(dp.date.toLocaleDateString());
+      datapoints2.push(dp.count);
+    }
   }
-
-  mySlider = $("#velslider").slider({});
-
-
-
-  randomScalingFactor = function () {
-    return Math.round(Math.random() * 200 - 100);
-  };
+  sliceData();
 
   var barChartData = {
     labels: labels,
@@ -429,8 +430,8 @@ function VelocityGraph() {
 
   };
 
-  var ctx = $("#velocityGraphCanvas");
-  new Chart(ctx, {
+  let ctx = $("#velocityGraphCanvas");
+  let chart = new Chart(ctx, {
     type: 'bar',
     data: barChartData,
     options: {
@@ -450,6 +451,32 @@ function VelocityGraph() {
       }
     }
   });
+
+
+  {
+    mySlider = $("#velslider").slider({
+      tooltip: 'show',
+      tooltip_position: 'bottom',
+      tooltip_split: true,
+      labelledby: ['#velsliderStartLabel', 'velsliderEndLabel'],
+      value: [0, sprintData.length],
+      min: 0,
+      max: sprintData.length - 1
+    });
+
+    let changeRange = (e, ) => {
+      let newV = e.value.newValue
+      console.log();
+      $("#velsliderStartLabel").text(sprintData[newV[0]].date.toLocaleDateString());
+      $("#velsliderEndLabel").text(sprintData[newV[1]].date.toLocaleDateString());
+      sliceData(newV[0], newV[1]);
+      chart.update();
+    };
+    mySlider.on('change', changeRange);
+    $("#velsliderStartLabel").text(labels[0]);
+    $("#velsliderEndLabel").text(labels[labels.length - 1]);
+  }
+
 };
 
 function VelocityGraph2() {
